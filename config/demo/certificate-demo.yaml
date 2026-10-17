@@ -1,0 +1,57 @@
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: spiffe-demo
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: certificate-demo
+  namespace: spiffe-demo
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: certificate-demo
+  namespace: spiffe-demo
+spec:
+  serviceAccountName: certificate-demo
+  restartPolicy: Always
+  containers:
+    - name: app
+      image: busybox:1.37
+      command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Pod Certificate demo started"
+          echo "Waiting for certificate at /var/run/spiffe/credential.pem"
+          while true; do
+            if [ -s /var/run/spiffe/credential.pem ]; then
+              echo "Certificate bundle is available"
+              break
+            fi
+            sleep 5
+          done
+          while true; do sleep 3600; done
+      volumeMounts:
+        - name: spiffe-credentials
+          mountPath: /var/run/spiffe
+          readOnly: true
+  volumes:
+    - name: spiffe-credentials
+      projected:
+        sources:
+          - podCertificate:
+              signerName: spiffe.weristdominik.de/workload
+              keyType: ECDSAP256
+              maxExpirationSeconds: 3600
+              credentialBundlePath: credential.pem
+          - clusterTrustBundle:
+              signerName: spiffe.weristdominik.de/workload
+              labelSelector:
+                matchLabels:
+                  spiffe.weristdominik.de/trust-domain: "cluster.local"
+                  spiffe.weristdominik.de/canarying: "development"
+              path: trust-bundle.pem
