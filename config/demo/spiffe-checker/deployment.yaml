@@ -1,0 +1,146 @@
+
+#
+# server
+#
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: spiffe-checker-server
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: checker-server
+  namespace: spiffe-checker-server
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spiffe-checker
+  namespace: spiffe-checker-server
+spec:
+  type: ClusterIP
+  selector:
+    app: spiffe-checker-server
+  ports:
+    - name: https
+      port: 8443
+      targetPort: 8443
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spiffe-checker-server
+  namespace: spiffe-checker-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spiffe-checker-server
+  template:
+    metadata:
+      labels:
+        app: spiffe-checker-server
+    spec:
+      serviceAccountName: checker-server
+      containers:
+        - name: spiffe-checker
+          image: spiffe-checker:local
+          imagePullPolicy: Never
+          args:
+            - --mode=server
+            - --listen=:8443
+            - --credential=/var/run/spiffe/credential.pem
+            - --trust-bundle=/var/run/spiffe/trust-bundle.pem
+            - --expected-client=spiffe://cluster.local/ns/spiffe-checker-client/sa/checker-client
+            - --reload-interval=2s
+            - --min-tls-version=1.3
+          ports:
+            - name: https
+              containerPort: 8443
+              protocol: TCP
+          volumeMounts:
+            - name: spiffe-credentials
+              mountPath: /var/run/spiffe
+              readOnly: true
+      volumes:
+        - name: spiffe-credentials
+          projected:
+            sources:
+              - podCertificate:
+                  signerName: spiffe.weristdominik.de/workload
+                  keyType: ECDSAP256
+                  maxExpirationSeconds: 3600
+                  credentialBundlePath: credential.pem
+              - clusterTrustBundle:
+                  signerName: spiffe.weristdominik.de/workload
+                  labelSelector:
+                    matchLabels:
+                      spiffe.weristdominik.de/trust-domain: "cluster.local"
+                      spiffe.weristdominik.de/canarying: "development"
+                  path: trust-bundle.pem
+---
+#
+# client
+#
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: spiffe-checker-client
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: checker-client
+  namespace: spiffe-checker-client
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spiffe-checker-client
+  namespace: spiffe-checker-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spiffe-checker-client
+  template:
+    metadata:
+      labels:
+        app: spiffe-checker-client
+    spec:
+      serviceAccountName: checker-client
+      containers:
+        - name: spiffe-checker
+          image: spiffe-checker:local
+          imagePullPolicy: Never
+          args:
+            - --mode=client
+            - --target=https://spiffe-checker.spiffe-checker-server.svc.cluster.local:8443/
+            - --credential=/var/run/spiffe/credential.pem
+            - --trust-bundle=/var/run/spiffe/trust-bundle.pem
+            - --expected-server=spiffe://cluster.local/ns/spiffe-checker-server/sa/checker-server
+            - --reload-interval=2s
+            - --request-interval=10s
+            - --min-tls-version=1.3
+          volumeMounts:
+            - name: spiffe-credentials
+              mountPath: /var/run/spiffe
+              readOnly: true
+      volumes:
+        - name: spiffe-credentials
+          projected:
+            sources:
+              - podCertificate:
+                  signerName: spiffe.weristdominik.de/workload
+                  keyType: ECDSAP256
+                  maxExpirationSeconds: 3600
+                  credentialBundlePath: credential.pem
+              - clusterTrustBundle:
+                  signerName: spiffe.weristdominik.de/workload
+                  labelSelector:
+                    matchLabels:
+                      spiffe.weristdominik.de/trust-domain: "cluster.local"
+                      spiffe.weristdominik.de/canarying: "development"
+                  path: trust-bundle.pem

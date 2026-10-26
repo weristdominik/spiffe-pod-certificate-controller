@@ -40,10 +40,11 @@ func main() {
 	var issuer signer.Issuer
 	var ca *signer.DevCA
 
+	// If debug enabled create local CA
+	// Issuer is automatically configured to be the created local CA
 	if debug {
 		ca, err = signer.NewDevCA()
 		must(err)
-
 		issuer = ca
 	}
 

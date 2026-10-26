@@ -98,7 +98,7 @@ func (ca *DevCA) Issue(
 	// Development-only identity mapping. Do not trust these fields
 	// without validating the referenced Kubernetes objects in production.
 	spiffeID, err := url.Parse(fmt.Sprintf(
-		"spiffe://weristdominik.de/ns/%s/sa/%s",
+		"spiffe://cluster.local/ns/%s/sa/%s",
 		pcr.Namespace,
 		pcr.Spec.ServiceAccountName,
 	))
@@ -127,7 +127,7 @@ func (ca *DevCA) Issue(
 		NotBefore:    notBefore,
 		NotAfter:     notAfter,
 		KeyUsage:     x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 	}
 
 	leafDER, err := x509.CreateCertificate(
