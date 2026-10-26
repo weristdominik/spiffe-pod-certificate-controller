@@ -33,6 +33,8 @@ kind: Deployment
 metadata:
   name: spiffe-checker-server
   namespace: spiffe-checker-server
+  labels:
+    app: spiffe-checker-server
 spec:
   replicas: 1
   selector:
